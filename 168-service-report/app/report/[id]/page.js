@@ -5,6 +5,13 @@ import { requireAdmin, vehicleCookieName, isValidVehicleSession } from "@/lib/au
 import { STATUS_STYLE, QUANTIFIED_ITEMS } from "@/lib/checklist";
 import StatusBadge from "@/components/StatusBadge";
 import ProgressBar from "@/components/ProgressBar";
+import HelpTooltip from "@/components/HelpTooltip";
+import { GLOSSARY } from "@/lib/glossary";
+import { computeHealthScore } from "@/lib/healthScore";
+import HealthGauge from "@/components/HealthGauge";
+import CarDiagram from "@/components/CarDiagram";
+import TrendChart from "@/components/TrendChart";
+import ReviewGenerator from "@/components/ReviewGenerator";
 import PrintButton from "./PrintButton";
 import ApproveButton from "./ApproveButton";
 import LineShareButton from "./LineShareButton";
@@ -37,6 +44,33 @@ export default async function ReportPage({ params }) {
     (sum, p) => sum + (Number(p.qty) || 0) * (Number(p.unit_price) || 0),
     0
   );
+
+  // 健康度總分:彙整檢測項目 + 數值化項目的狀態
+  const quantifiedStatuses = {};
+  for (const q of QUANTIFIED_ITEMS) {
+    const values = quantified[q.key];
+    if (!values) continue;
+    for (const f of q.fields) {
+      const v = values[f.key];
+      if (v === "" || v === undefined || v === null) continue;
+      quantifiedStatuses[`${q.key}_${f.key}`] = q.computeStatus(v);
+    }
+  }
+  const healthScore = computeHealthScore(checklist, quantifiedStatuses);
+
+  // 里程/花費趨勢:抓這台車全部報告
+  const historyRes = await sql`
+    SELECT report_date, mileage, parts FROM reports
+    WHERE vehicle_id = ${vehicle.id}
+    ORDER BY report_date ASC, created_at ASC
+  `;
+  const trendData = historyRes.rows.map((r) => ({
+    label: String(r.report_date).slice(5, 10),
+    mileage: r.mileage || 0,
+    spend: (r.parts || []).reduce((s, p) => s + (Number(p.qty) || 0) * (Number(p.unit_price) || 0), 0),
+  }));
+  const mileageTrend = trendData.filter((d) => d.mileage > 0).map((d) => ({ label: d.label, value: d.mileage }));
+  const spendTrend = trendData.map((d) => ({ label: d.label, value: d.spend }));
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL || `https://${headers().get("host")}`;
@@ -90,6 +124,18 @@ export default async function ReportPage({ params }) {
           </div>
         </section>
 
+        {healthScore && (
+          <section className="flex justify-center border-y border-line py-6">
+            <HealthGauge score={healthScore.score} label={healthScore.label} color={healthScore.color} />
+          </section>
+        )}
+
+        <section>
+          <h2 className="font-display text-lg text-ink mb-3">車輛部位說明</h2>
+          <p className="text-xs text-ink/40 mb-2">點圖上的部位,看看每個地方在檢查什麼</p>
+          <CarDiagram />
+        </section>
+
         {Object.keys(quantified).some((k) => quantified[k] && Object.values(quantified[k]).some((v) => v !== "" && v !== null && v !== undefined)) && (
           <section>
             <h2 className="font-display text-lg text-ink mb-3">關鍵零件狀態</h2>
@@ -101,7 +147,10 @@ export default async function ReportPage({ params }) {
                 if (!hasAny) return null;
                 return (
                   <div key={q.key}>
-                    <p className="text-sm font-medium text-ink mb-2">{q.label}</p>
+                    <p className="text-sm font-medium text-ink mb-2">
+                      {q.label}
+                      <HelpTooltip text={GLOSSARY[q.label]} />
+                    </p>
                     <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                       {q.fields.map((f) => {
                         const v = values[f.key];
@@ -133,7 +182,10 @@ export default async function ReportPage({ params }) {
             <tbody>
               {checklist.map((row, i) => (
                 <tr key={i} className="border-b border-line">
-                  <td className="py-2 pr-3 text-ink align-top">{row.item}</td>
+                  <td className="py-2 pr-3 text-ink align-top">
+                    {row.item}
+                    <HelpTooltip text={GLOSSARY[row.item]} />
+                  </td>
                   <td className="py-2 pr-3 align-top whitespace-nowrap">
                     <StatusBadge status={row.status} />
                   </td>
@@ -223,6 +275,22 @@ export default async function ReportPage({ params }) {
           </section>
         )}
 
+        {mileageTrend.length > 1 && (
+          <section>
+            <h2 className="font-display text-lg text-ink mb-3">里程 / 保養花費趨勢</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-ink/40 mb-1">里程數(km)</p>
+                <TrendChart data={mileageTrend} type="line" color="#3B5A73" />
+              </div>
+              <div>
+                <p className="text-xs text-ink/40 mb-1">單次花費($)</p>
+                <TrendChart data={spendTrend} type="bar" color="#E8A33D" />
+              </div>
+            </div>
+          </section>
+        )}
+
         {isVehicleOwner && (
           <section className="no-print">
             <ApproveButton
@@ -230,6 +298,12 @@ export default async function ReportPage({ params }) {
               approved={report.customer_approved}
               approvedAt={report.customer_approved_at}
             />
+          </section>
+        )}
+
+        {isVehicleOwner && (
+          <section className="no-print">
+            <ReviewGenerator />
           </section>
         )}
 
