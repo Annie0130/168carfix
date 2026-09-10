@@ -1,0 +1,32 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "IBM Plex Sans", sans-serif;
+  background-color: #f7f5f1;
+  color: #14181c;
+}
+
+.font-display {
+  font-family: "Barlow Condensed", sans-serif;
+}
+
+.font-mono-data {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
