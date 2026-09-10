@@ -9,7 +9,7 @@ import HelpTooltip from "@/components/HelpTooltip";
 import { GLOSSARY } from "@/lib/glossary";
 import { computeHealthScore } from "@/lib/healthScore";
 import HealthGauge from "@/components/HealthGauge";
-import CarDiagram from "@/components/CarDiagram";
+import VehicleDiagramSection from "@/components/VehicleDiagramSection";
 import TrendChart from "@/components/TrendChart";
 import ReviewGenerator from "@/components/ReviewGenerator";
 import PrintButton from "./PrintButton";
@@ -131,9 +131,7 @@ export default async function ReportPage({ params }) {
         )}
 
         <section>
-          <h2 className="font-display text-lg text-ink mb-3">車輛部位說明</h2>
-          <p className="text-xs text-ink/40 mb-2">點圖上的部位,看看每個地方在檢查什麼</p>
-          <CarDiagram />
+          <VehicleDiagramSection checklist={checklist} />
         </section>
 
         {Object.keys(quantified).some((k) => quantified[k] && Object.values(quantified[k]).some((v) => v !== "" && v !== null && v !== undefined)) && (
@@ -175,26 +173,6 @@ export default async function ReportPage({ params }) {
             </div>
           </section>
         )}
-
-        <section>
-          <h2 className="font-display text-lg text-ink mb-3">檢測項目</h2>
-          <table className="w-full text-sm border-t border-line">
-            <tbody>
-              {checklist.map((row, i) => (
-                <tr key={i} className="border-b border-line">
-                  <td className="py-2 pr-3 text-ink align-top">
-                    {row.item}
-                    <HelpTooltip text={GLOSSARY[row.item]} />
-                  </td>
-                  <td className="py-2 pr-3 align-top whitespace-nowrap">
-                    <StatusBadge status={row.status} />
-                  </td>
-                  <td className="py-2 text-ink/50 align-top">{row.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
 
         {parts.length > 0 && (
           <section>
