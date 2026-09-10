@@ -4,6 +4,7 @@ import Link from "next/link";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import NewReportForm from "./NewReportForm";
+import StatusPanel from "./StatusPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,10 @@ export default async function VehicleDetailPage({ params }) {
             下載 QR Code
           </a>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <StatusPanel vehicle={vehicle} />
       </div>
 
       <NewReportForm vehicleId={vehicle.id} />

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { vehicleCookieName, isValidVehicleSession } from "@/lib/auth";
+import { statusToStepIndex } from "@/lib/board";
+import StepperProgress from "@/components/StepperProgress";
+import QuickActionBar from "@/components/QuickActionBar";
 import VerifyForm from "./VerifyForm";
 
 export const dynamic = "force-dynamic";
@@ -27,16 +30,44 @@ export default async function VehiclePage({ params }) {
   `;
 
   return (
-    <main className="min-h-screen px-6 py-10 max-w-2xl mx-auto">
+    <main className="min-h-screen px-6 py-10 max-w-2xl mx-auto pb-24">
       <p className="font-mono-data text-xs tracking-wide text-steel mb-1">
         168 汽車維修中心
       </p>
       <h1 className="font-display text-3xl font-semibold text-ink font-mono-data mb-1">
         {vehicle.plate}
       </h1>
-      <p className="text-sm text-ink/60 mb-8">
+      <p className="text-sm text-ink/60 mb-6">
         {vehicle.owner_name || "—"} · {vehicle.car_model || "未填車型"}
       </p>
+
+      {vehicle.status && (
+        <section className="border border-line bg-white rounded-sm p-5 mb-8">
+          <div className="flex justify-between text-sm mb-4">
+            <div>
+              <p className="text-ink/40 text-xs mb-0.5">負責技師</p>
+              <p className="text-ink font-medium">{vehicle.assigned_technician || "尚未指派"}</p>
+            </div>
+            {vehicle.estimated_completion && (
+              <div className="text-right">
+                <p className="text-ink/40 text-xs mb-0.5">預估完工取車</p>
+                <p className="text-ink font-medium font-mono-data">
+                  {new Date(vehicle.estimated_completion).toLocaleString("zh-TW", {
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            )}
+          </div>
+          <StepperProgress currentIndex={statusToStepIndex(vehicle.status)} />
+          <p className="text-center text-sm text-orange-600 font-medium mt-4">
+            目前狀態:{vehicle.status}
+          </p>
+        </section>
+      )}
 
       <h2 className="font-display text-xl text-ink mb-4">車輛維修履歷</h2>
 
@@ -85,6 +116,8 @@ export default async function VehiclePage({ params }) {
           );
         })}
       </ol>
+
+      <QuickActionBar shopPhone="0908109057" shopAddress="新北市五股區登林路91-7號" />
     </main>
   );
 }

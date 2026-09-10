@@ -32,7 +32,15 @@ export default async function DashboardPage() {
             車輛總覽
           </h1>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/board"
+            className="bg-ink text-paper px-4 py-2 rounded-sm hover:bg-steel transition-colors text-sm font-mono-data"
+          >
+            廠內即時看板 →
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       <AddVehicleForm />
