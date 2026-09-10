@@ -1,5 +1,5 @@
 -- 168 汽車維修中心 電子檢測報告系統
--- 資料表結構
+-- 資料表結構(全新安裝用,已包含階段 A 的欄位)
 
 CREATE TABLE IF NOT EXISTS vehicles (
   id SERIAL PRIMARY KEY,
@@ -16,8 +16,15 @@ CREATE TABLE IF NOT EXISTS reports (
   report_date DATE NOT NULL DEFAULT CURRENT_DATE,
   mileage INTEGER,
   checklist JSONB NOT NULL,
+  quantified JSONB DEFAULT '{}'::jsonb,
   summary TEXT,
   technician VARCHAR(100),
+  parts JSONB DEFAULT '[]'::jsonb,
+  advisory_items JSONB DEFAULT '[]'::jsonb,
+  next_service_mileage INTEGER,
+  next_service_date DATE,
+  customer_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  customer_approved_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

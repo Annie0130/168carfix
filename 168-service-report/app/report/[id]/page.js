@@ -1,9 +1,13 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin, vehicleCookieName, isValidVehicleSession } from "@/lib/auth";
-import { STATUS_STYLE } from "@/lib/checklist";
+import { STATUS_STYLE, QUANTIFIED_ITEMS } from "@/lib/checklist";
+import StatusBadge from "@/components/StatusBadge";
+import ProgressBar from "@/components/ProgressBar";
 import PrintButton from "./PrintButton";
+import ApproveButton from "./ApproveButton";
+import LineShareButton from "./LineShareButton";
 import VerifyForm from "../../vehicle/[plate]/VerifyForm";
 
 export const dynamic = "force-dynamic";
@@ -26,15 +30,30 @@ export default async function ReportPage({ params }) {
   }
 
   const checklist = report.checklist || [];
+  const quantified = report.quantified || {};
+  const parts = report.parts || [];
+  const advisoryItems = report.advisory_items || [];
+  const partsTotal = parts.reduce(
+    (sum, p) => sum + (Number(p.qty) || 0) * (Number(p.unit_price) || 0),
+    0
+  );
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || `https://${headers().get("host")}`;
+  const reportUrl = `${baseUrl}/report/${report.id}`;
 
   return (
     <main className="min-h-screen px-6 py-10">
-      <div className="max-w-2xl mx-auto flex justify-end mb-4 no-print">
+      <div className="max-w-2xl mx-auto flex justify-end gap-2 mb-4 no-print">
+        <LineShareButton
+          url={reportUrl}
+          text={`${vehicle.plate} 車輛檢測報告 - 168汽車維修中心`}
+        />
         <PrintButton />
       </div>
 
-      <div className="print-sheet max-w-2xl mx-auto bg-white border border-line rounded-sm p-8 md:p-10">
-        <header className="flex items-start justify-between border-b border-line pb-6 mb-6">
+      <div className="print-sheet max-w-2xl mx-auto bg-white border border-line rounded-sm p-8 md:p-10 space-y-8">
+        <header className="flex items-start justify-between border-b border-line pb-6">
           <div>
             <p className="font-mono-data text-xs tracking-wide text-steel mb-1">
               車輛檢測報告
@@ -52,7 +71,7 @@ export default async function ReportPage({ params }) {
           </div>
         </header>
 
-        <section className="grid grid-cols-2 gap-4 mb-8 text-sm">
+        <section className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-ink/40 mb-0.5">車牌</p>
             <p className="font-mono-data text-ink font-medium">{vehicle.plate}</p>
@@ -71,29 +90,132 @@ export default async function ReportPage({ params }) {
           </div>
         </section>
 
-        <section className="mb-8">
+        {Object.keys(quantified).some((k) => quantified[k] && Object.values(quantified[k]).some((v) => v !== "" && v !== null && v !== undefined)) && (
+          <section>
+            <h2 className="font-display text-lg text-ink mb-3">關鍵零件狀態</h2>
+            <div className="space-y-4">
+              {QUANTIFIED_ITEMS.map((q) => {
+                const values = quantified[q.key];
+                if (!values) return null;
+                const hasAny = q.fields.some((f) => values[f.key] !== "" && values[f.key] !== undefined && values[f.key] !== null);
+                if (!hasAny) return null;
+                return (
+                  <div key={q.key}>
+                    <p className="text-sm font-medium text-ink mb-2">{q.label}</p>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                      {q.fields.map((f) => {
+                        const v = values[f.key];
+                        if (v === "" || v === undefined || v === null) return null;
+                        const status = q.computeStatus(v);
+                        const pct = q.computePercent(v);
+                        return (
+                          <ProgressBar
+                            key={f.key}
+                            label={f.label}
+                            value={pct}
+                            rawValue={v}
+                            unit={q.unit}
+                            status={status}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <section>
           <h2 className="font-display text-lg text-ink mb-3">檢測項目</h2>
           <table className="w-full text-sm border-t border-line">
             <tbody>
               {checklist.map((row, i) => (
                 <tr key={i} className="border-b border-line">
-                  <td className="py-2 pr-3 text-ink">{row.item}</td>
-                  <td
-                    className={`py-2 pr-3 font-medium whitespace-nowrap ${
-                      STATUS_STYLE[row.status] || "text-ink"
-                    }`}
-                  >
-                    {row.status}
+                  <td className="py-2 pr-3 text-ink align-top">{row.item}</td>
+                  <td className="py-2 pr-3 align-top whitespace-nowrap">
+                    <StatusBadge status={row.status} />
                   </td>
-                  <td className="py-2 text-ink/50">{row.note}</td>
+                  <td className="py-2 text-ink/50 align-top">{row.note}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
 
+        {parts.length > 0 && (
+          <section>
+            <h2 className="font-display text-lg text-ink mb-3">本次維修 / 更換零件</h2>
+            <table className="w-full text-sm border-t border-line">
+              <thead>
+                <tr className="text-ink/40 text-xs">
+                  <th className="text-left py-1.5 font-normal">項目</th>
+                  <th className="text-right py-1.5 font-normal">數量</th>
+                  <th className="text-right py-1.5 font-normal">單價</th>
+                  <th className="text-right py-1.5 font-normal">小計</th>
+                  <th className="text-left py-1.5 font-normal pl-4">保固</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parts.map((p, i) => (
+                  <tr key={i} className="border-t border-line">
+                    <td className="py-2 text-ink">{p.name}</td>
+                    <td className="py-2 text-right font-mono-data">{p.qty}</td>
+                    <td className="py-2 text-right font-mono-data">{p.unit_price}</td>
+                    <td className="py-2 text-right font-mono-data">
+                      {(Number(p.qty) || 0) * (Number(p.unit_price) || 0)}
+                    </td>
+                    <td className="py-2 text-ink/50 pl-4">{p.warranty || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-line">
+                  <td colSpan={3} className="py-2 text-right text-ink/60">總計</td>
+                  <td className="py-2 text-right font-mono-data font-medium">{partsTotal}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+        )}
+
+        {(report.next_service_mileage || report.next_service_date) && (
+          <section>
+            <h2 className="font-display text-lg text-ink mb-3">下次保養建議</h2>
+            <div className="flex gap-6 text-sm">
+              {report.next_service_mileage && (
+                <div>
+                  <p className="text-ink/40 mb-0.5">建議里程</p>
+                  <p className="font-mono-data text-ink">{report.next_service_mileage.toLocaleString()} km</p>
+                </div>
+              )}
+              {report.next_service_date && (
+                <div>
+                  <p className="text-ink/40 mb-0.5">建議日期</p>
+                  <p className="font-mono-data text-ink">{String(report.next_service_date).slice(0, 10)}</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {advisoryItems.length > 0 && (
+          <section>
+            <h2 className="font-display text-lg text-ink mb-3">待修 / 建議後續更換項目</h2>
+            <div className="flex flex-wrap gap-2">
+              {advisoryItems.map((a, i) => (
+                <span key={i} className="bg-amber-50 border border-amber-200 text-amber-800 rounded-full px-3 py-1 text-sm">
+                  {a}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
         {report.summary && (
-          <section className="mb-8">
+          <section>
             <h2 className="font-display text-lg text-ink mb-2">整體建議</h2>
             <p className="text-sm text-ink/80 whitespace-pre-wrap leading-relaxed">
               {report.summary}
@@ -101,7 +223,17 @@ export default async function ReportPage({ params }) {
           </section>
         )}
 
-        <footer className="border-t border-line pt-4 mt-10 text-xs text-ink/40 flex justify-between">
+        {isVehicleOwner && (
+          <section className="no-print">
+            <ApproveButton
+              reportId={report.id}
+              approved={report.customer_approved}
+              approvedAt={report.customer_approved_at}
+            />
+          </section>
+        )}
+
+        <footer className="border-t border-line pt-4 text-xs text-ink/40 flex justify-between">
           <span>本報告由 168 汽車維修中心 提供</span>
           <span className="font-mono-data">報告編號 #{report.id}</span>
         </footer>
