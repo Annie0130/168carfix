@@ -1,5 +1,5 @@
 -- 168 汽車維修中心 電子檢測報告系統
--- 資料表結構(全新安裝用,已包含階段 A 的欄位)
+-- 資料表結構(全新安裝用,已包含階段 A + A2 的欄位)
 
 CREATE TABLE IF NOT EXISTS vehicles (
   id SERIAL PRIMARY KEY,
@@ -7,6 +7,12 @@ CREATE TABLE IF NOT EXISTS vehicles (
   phone VARCHAR(20) NOT NULL,
   owner_name VARCHAR(100),
   car_model VARCHAR(100),
+  status VARCHAR(30) DEFAULT '待檢測',
+  status_changed_at TIMESTAMP DEFAULT NOW(),
+  assigned_technician VARCHAR(100),
+  estimated_completion TIMESTAMP,
+  same_day_pickup BOOLEAN NOT NULL DEFAULT FALSE,
+  customer_waiting BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -30,3 +36,4 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_vehicle_id ON reports(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_vehicles_plate ON vehicles(plate);
+CREATE INDEX IF NOT EXISTS idx_vehicles_status ON vehicles(status);
